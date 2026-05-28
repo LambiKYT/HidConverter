@@ -8,7 +8,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Query
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.converters import (
     ImageConverter, AudioConverter, VideoConverter,
     DocumentConverter, DataConverter, HashConverter,
+    encode_qr, decode_qr, clean_metadata,
+    download_from_url, download_youtube_audio,
 )
 from backend.utils import (
     validate_file_size, validate_extension, get_category,
@@ -54,7 +56,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HidConverter",
     description="Universal file conversion API",
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
@@ -89,7 +91,8 @@ async def get_categories():
 
 async def _convert_single(file: UploadFile, target_format: str, job_dir: Path,
                           quality: Optional[int] = None,
-                          bitrate: Optional[str] = None) -> str:
+                          bitrate: Optional[str] = None,
+                          clean_meta: bool = False) -> str:
     ext = os.path.splitext(file.filename or "")[1].lstrip(".").lower()
     logger.info(f"Converting: {file.filename} (.{ext}) -> {target_format}")
 
@@ -113,6 +116,13 @@ async def _convert_single(file: UploadFile, target_format: str, job_dir: Path,
     with open(input_path, "wb") as f:
         f.write(contents)
 
+    if clean_meta and category == "image":
+        logger.info(f"Stripping metadata from {input_path}")
+        try:
+            clean_metadata(str(input_path), str(input_path))
+        except Exception as e:
+            logger.warning(f"Metadata cleaning failed (continuing): {e}")
+
     kwargs = {}
     if quality is not None:
         kwargs["quality"] = quality
@@ -134,6 +144,7 @@ async def convert_files(
     target_format: str = Form(...),
     quality: Optional[int] = Form(None),
     bitrate: Optional[str] = Form(None),
+    clean_meta: bool = Form(False),
 ):
     job_id = uuid.uuid4().hex
     job_dir = UPLOAD_DIR / job_id
@@ -141,7 +152,7 @@ async def convert_files(
     background_tasks.add_task(cleanup_uploads, str(UPLOAD_DIR))
 
     if len(files) == 1:
-        output_path = await _convert_single(files[0], target_format, job_dir, quality, bitrate)
+        output_path = await _convert_single(files[0], target_format, job_dir, quality, bitrate, clean_meta)
         out_name = os.path.basename(output_path)
         return FileResponse(output_path, filename=out_name, media_type="application/octet-stream")
 
@@ -149,7 +160,7 @@ async def convert_files(
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for file in files:
             try:
-                output_path = await _convert_single(file, target_format, job_dir, quality, bitrate)
+                output_path = await _convert_single(file, target_format, job_dir, quality, bitrate, clean_meta)
                 zf.write(output_path, arcname=os.path.basename(output_path))
             except HTTPException as e:
                 logger.warning(f"Skipping {file.filename}: {e.detail}")
@@ -161,6 +172,75 @@ async def convert_files(
         f.write(zip_buffer.getvalue())
 
     return FileResponse(zip_path, filename="converted.zip", media_type="application/zip")
+
+
+@app.post("/api/convert-url")
+async def convert_url(
+    background_tasks: BackgroundTasks,
+    url: str = Form(...),
+    target_format: str = Form(...),
+    quality: Optional[int] = Form(None),
+    bitrate: Optional[str] = Form(None),
+    clean_meta: bool = Form(False),
+):
+    logger.info(f"URL convert: {url} -> {target_format}")
+
+    job_id = uuid.uuid4().hex
+    job_dir = UPLOAD_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    background_tasks.add_task(cleanup_uploads, str(UPLOAD_DIR))
+
+    try:
+        downloaded_path = download_from_url(url, str(job_dir))
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    ext = os.path.splitext(downloaded_path)[1].lstrip(".").lower()
+    category = get_category(ext)
+
+    if not category or category == "unknown":
+        raise HTTPException(status_code=400, detail=f"Cannot determine file type from: {downloaded_path}")
+
+    audio_exts = {"mp3", "wav", "ogg", "flac", "m4a", "aac"}
+    is_audio_target = target_format in audio_exts
+    is_youtube = "youtube" in url.lower() or "youtu.be" in url.lower()
+
+    if is_youtube and is_audio_target:
+        try:
+            output_path = download_youtube_audio(url, str(job_dir), target_format)
+            out_name = os.path.basename(output_path)
+            return FileResponse(output_path, filename=out_name, media_type="application/octet-stream")
+        except RuntimeError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+
+    converter = converters.get(category)
+    if not converter:
+        raise HTTPException(status_code=400, detail=f"No converter for category: {category}")
+
+    conv_map = converter.supported_conversions()
+    if ext not in conv_map or target_format not in conv_map[ext]:
+        raise HTTPException(status_code=400, detail=f"Conversion .{ext} -> .{target_format} not supported")
+
+    if clean_meta and category == "image":
+        try:
+            clean_metadata(downloaded_path, downloaded_path)
+        except Exception as e:
+            logger.warning(f"Metadata cleaning failed (continuing): {e}")
+
+    kwargs = {}
+    if quality is not None:
+        kwargs["quality"] = quality
+    if bitrate is not None:
+        kwargs["bitrate"] = bitrate
+
+    try:
+        output_path = converter.convert(downloaded_path, target_format, str(job_dir), **kwargs)
+        out_name = os.path.basename(output_path)
+        return FileResponse(output_path, filename=out_name, media_type="application/octet-stream")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Ошибка в данных: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Ошибка конвертации: {e}")
 
 
 @app.post("/api/hash")
@@ -188,6 +268,86 @@ async def hash_file(
         "sha256": hashlib.sha256(data).hexdigest(),
     }
     return JSONResponse(content=result)
+
+
+@app.post("/api/qr/encode")
+async def qr_encode(
+    text: str = Form(...),
+    fmt: str = Form("png"),
+):
+    job_id = uuid.uuid4().hex
+    job_dir = UPLOAD_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    if fmt not in ("png", "svg"):
+        fmt = "png"
+
+    out_path = os.path.join(str(job_dir), f"qrcode.{fmt}")
+
+    try:
+        encode_qr(text, out_path, fmt)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"QR generation failed: {e}")
+
+    media_map = {"png": "image/png", "svg": "image/svg+xml"}
+    return FileResponse(out_path, filename=f"qrcode.{fmt}", media_type=media_map.get(fmt, "application/octet-stream"))
+
+
+@app.post("/api/qr/decode")
+async def qr_decode(
+    file: UploadFile = File(...),
+):
+    contents = await file.read()
+    if not validate_file_size(len(contents)):
+        raise HTTPException(status_code=413, detail="File too large")
+
+    job_id = uuid.uuid4().hex
+    job_dir = UPLOAD_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    ext = os.path.splitext(file.filename or "image.png")[1].lower()
+    input_path = os.path.join(str(job_dir), f"qr_input{ext}")
+    with open(input_path, "wb") as f:
+        f.write(contents)
+
+    try:
+        decoded = decode_qr(input_path)
+        return JSONResponse(content={"text": decoded})
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"QR decode failed: {e}")
+
+
+@app.post("/api/metadata/clean")
+async def metadata_clean(
+    file: UploadFile = File(...),
+):
+    contents = await file.read()
+    if not validate_file_size(len(contents)):
+        raise HTTPException(status_code=413, detail="File too large")
+
+    job_id = uuid.uuid4().hex
+    job_dir = UPLOAD_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    ext = os.path.splitext(file.filename or "file.bin")[1].lower()
+    input_path = os.path.join(str(job_dir), f"input{ext}")
+    output_path = os.path.join(str(job_dir), f"cleaned{ext}")
+
+    with open(input_path, "wb") as f:
+        f.write(contents)
+
+    try:
+        clean_metadata(input_path, output_path)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Metadata cleaning failed: {e}")
+
+    return FileResponse(output_path, filename=f"cleaned{ext}", media_type="application/octet-stream")
 
 
 @app.exception_handler(Exception)

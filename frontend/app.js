@@ -4,6 +4,7 @@ const API_BASE = "/api";
 const modeTabs = document.querySelectorAll(".mode-tab");
 const convertMode = document.getElementById("convertMode");
 const hashMode = document.getElementById("hashMode");
+const qrMode = document.getElementById("qrMode");
 const dropZone = document.getElementById("dropZone");
 const dropContent = document.getElementById("dropContent");
 const fileInput = document.getElementById("fileInput");
@@ -17,6 +18,9 @@ const settingsBody = document.getElementById("settingsBody");
 const qualityRange = document.getElementById("qualityRange");
 const qualityValue = document.getElementById("qualityValue");
 const bitrateSelect = document.getElementById("bitrateSelect");
+const cleanMetaCheck = document.getElementById("cleanMetaCheck");
+const urlInput = document.getElementById("urlInput");
+const convertUrlBtn = document.getElementById("convertUrlBtn");
 const progressSection = document.getElementById("progressSection");
 const progressFill = document.getElementById("progressFill");
 const progressText = document.getElementById("progressText");
@@ -35,6 +39,23 @@ const hashSha1 = document.getElementById("hashSha1");
 const hashSha256 = document.getElementById("hashSha256");
 const errorToast = document.getElementById("errorToast");
 const errorMessage = document.getElementById("errorMessage");
+
+// --- QR DOM refs ---
+const qrTabs = document.querySelectorAll(".qr-tab");
+const qrEncode = document.getElementById("qrEncode");
+const qrDecode = document.getElementById("qrDecode");
+const qrTextInput = document.getElementById("qrTextInput");
+const qrFormatSelect = document.getElementById("qrFormatSelect");
+const qrEncodeBtn = document.getElementById("qrEncodeBtn");
+const qrResultImg = document.getElementById("qrResultImg");
+const qrImage = document.getElementById("qrImage");
+const qrDownloadBtn = document.getElementById("qrDownloadBtn");
+const qrFileZone = document.getElementById("qrFileZone");
+const qrFileInput = document.getElementById("qrFileInput");
+const qrFileLabel = document.getElementById("qrFileLabel");
+const qrDecodeBtn = document.getElementById("qrDecodeBtn");
+const qrDecodeResult = document.getElementById("qrDecodeResult");
+const qrDecodedText = document.getElementById("qrDecodedText");
 
 // --- State ---
 let selectedFiles = [];
@@ -67,6 +88,14 @@ function findCategory(ext) {
         if (exts.includes(ext)) return cat;
     }
     return null;
+}
+
+function isImageExt(ext) {
+    return ["png", "jpg", "jpeg", "webp", "bmp", "gif", "ico"].includes(ext);
+}
+
+function isAudioExt(ext) {
+    return ["mp3", "wav", "ogg", "flac", "m4a", "aac"].includes(ext);
 }
 
 function setProgress(pct, label) {
@@ -102,6 +131,7 @@ modeTabs.forEach(tab => {
         currentMode = tab.dataset.mode;
         convertMode.style.display = currentMode === "convert" ? "" : "none";
         hashMode.style.display = currentMode === "hash" ? "" : "none";
+        qrMode.style.display = currentMode === "qr" ? "" : "none";
     });
 });
 
@@ -141,13 +171,26 @@ function renderFileList() {
     selectedFiles.forEach((file, i) => {
         const item = document.createElement("div");
         item.className = "file-list-item";
-        item.innerHTML = `
-            <div class="file-icon">
+
+        const ext = getExtension(file.name);
+        let previewHtml = "";
+        if (isImageExt(ext)) {
+            const url = URL.createObjectURL(file);
+            previewHtml = `<div class="file-preview"><img src="${url}" alt=""></div>`;
+        } else if (isAudioExt(ext)) {
+            const url = URL.createObjectURL(file);
+            previewHtml = `<div class="file-preview"><audio controls><source src="${url}" type="${file.type}"></audio></div>`;
+        } else {
+            previewHtml = `<div class="file-icon">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
                 </svg>
-            </div>
+            </div>`;
+        }
+
+        item.innerHTML = `
+            ${previewHtml}
             <div class="file-body">
                 <span class="file-name">${file.name}</span>
                 <span class="file-size">${formatBytes(file.size)}</span>
@@ -199,6 +242,37 @@ function updateControls() {
     }
 }
 
+// --- Clipboard paste (Ctrl+V) ---
+document.addEventListener("paste", async (e) => {
+    if (currentMode !== "convert") return;
+
+    const items = e.clipboardData.items;
+    let found = false;
+
+    for (const item of items) {
+        if (item.kind === "file") {
+            const file = item.getAsFile();
+            if (file) {
+                const ts = Date.now();
+                const renamed = new File([file], `clipboard_${ts}.${file.name.split(".").pop() || "png"}`, { type: file.type });
+                addFiles([renamed]);
+                found = true;
+            }
+        }
+    }
+
+    if (!found) {
+        const text = e.clipboardData.getData("text");
+        if (text && text.trim()) {
+            const ts = Date.now();
+            const blob = new Blob([text], { type: "text/plain" });
+            const file = new File([blob], `clipboard_${ts}.txt`, { type: "text/plain" });
+            addFiles([file]);
+            found = true;
+        }
+    }
+});
+
 // --- Drop zone ---
 dropZone.addEventListener("click", () => fileInput.click());
 
@@ -245,6 +319,7 @@ convertBtn.addEventListener("click", async () => {
     formData.append("target_format", target);
     formData.append("quality", qualityRange.value);
     formData.append("bitrate", bitrateSelect.value);
+    formData.append("clean_meta", cleanMetaCheck.checked ? "true" : "false");
 
     try {
         const xhr = new XMLHttpRequest();
@@ -308,6 +383,66 @@ resetBtn.addEventListener("click", () => {
     setProgress(0, "");
 });
 
+// --- Convert URL flow ---
+convertUrlBtn.addEventListener("click", async () => {
+    const url = urlInput.value.trim();
+    if (!url) { showError("Введите URL для скачивания и конвертации"); return; }
+
+    convertUrlBtn.disabled = true;
+    resultSection.style.display = "none";
+    progressSection.style.display = "block";
+    setProgress(0, "Загрузка по URL...");
+
+    const target = formatSelect.value || "jpg";
+
+    const formData = new FormData();
+    formData.append("url", url);
+    formData.append("target_format", target);
+    formData.append("quality", qualityRange.value);
+    formData.append("bitrate", bitrateSelect.value);
+    formData.append("clean_meta", cleanMetaCheck.checked ? "true" : "false");
+
+    try {
+        const xhr = new XMLHttpRequest();
+        const promise = new Promise((resolve, reject) => {
+            xhr.addEventListener("load", () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    setProgress(100, "Готово!");
+                    resolve(xhr.response);
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        let msg = "Ошибка";
+                        try { const err = JSON.parse(reader.result); msg = err.error || err.detail || msg; } catch {}
+                        reject(new Error(msg));
+                    };
+                    reader.readAsText(xhr.response);
+                }
+            });
+            xhr.addEventListener("error", () => reject(new Error("Сетевая ошибка")));
+            xhr.addEventListener("abort", () => reject(new Error("Отменено")));
+            xhr.responseType = "blob";
+            xhr.open("POST", `${API_BASE}/convert-url`);
+            xhr.send(formData);
+        });
+
+        const blob = await promise;
+        const outName = `converted_${Date.now()}.${target}`;
+
+        const blobUrl = URL.createObjectURL(blob);
+        downloadBtn.href = blobUrl;
+        downloadBtn.download = outName;
+
+        resultText.textContent = "Конвертация по URL завершена!";
+        setProgress(100, "Успешно!");
+        resultSection.style.display = "block";
+    } catch (err) {
+        showProgressError(err.message);
+    } finally {
+        convertUrlBtn.disabled = false;
+    }
+});
+
 // --- Hash mode ---
 hashFileZone.addEventListener("click", () => hashFileInput.click());
 
@@ -352,6 +487,87 @@ hashBtn.addEventListener("click", async () => {
         showError("Сетевая ошибка");
     } finally {
         hashBtn.disabled = false;
+    }
+});
+
+// --- QR Mode tabs ---
+qrTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+        qrTabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        const mode = tab.dataset.qrMode;
+        qrEncode.style.display = mode === "encode" ? "" : "none";
+        qrDecode.style.display = mode === "decode" ? "" : "none";
+    });
+});
+
+// --- QR Encode ---
+qrEncodeBtn.addEventListener("click", async () => {
+    const text = qrTextInput.value.trim();
+    if (!text) { showError("Введите текст или URL для QR-кода"); return; }
+
+    qrEncodeBtn.disabled = true;
+    qrResultImg.style.display = "none";
+
+    const fmt = qrFormatSelect.value;
+
+    const formData = new FormData();
+    formData.append("text", text);
+    formData.append("fmt", fmt);
+
+    try {
+        const res = await fetch(`${API_BASE}/qr/encode`, { method: "POST", body: formData });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: "Ошибка генерации QR" }));
+            throw new Error(err.error || err.detail || "Ошибка генерации QR");
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+
+        qrImage.src = url;
+        qrDownloadBtn.href = url;
+        qrDownloadBtn.download = `qrcode.${fmt}`;
+        qrResultImg.style.display = "block";
+    } catch (err) {
+        showError(err.message);
+    } finally {
+        qrEncodeBtn.disabled = false;
+    }
+});
+
+// --- QR Decode ---
+qrFileZone.addEventListener("click", () => qrFileInput.click());
+
+qrFileInput.addEventListener("change", () => {
+    if (qrFileInput.files.length) {
+        qrFileLabel.textContent = qrFileInput.files[0].name;
+        qrFileZone.classList.add("has-file");
+    }
+});
+
+qrDecodeBtn.addEventListener("click", async () => {
+    const file = qrFileInput.files[0];
+    if (!file) { showError("Выберите изображение с QR-кодом"); return; }
+
+    qrDecodeBtn.disabled = true;
+    qrDecodeResult.style.display = "none";
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const res = await fetch(`${API_BASE}/qr/decode`, { method: "POST", body: formData });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || data.detail || "Ошибка декодирования");
+        }
+        qrDecodedText.value = data.text;
+        qrDecodeResult.style.display = "flex";
+    } catch (err) {
+        showError(err.message);
+    } finally {
+        qrDecodeBtn.disabled = false;
     }
 });
 

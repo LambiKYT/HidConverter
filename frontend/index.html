@@ -16,6 +16,7 @@
         <div class="mode-tabs">
             <button class="mode-tab active" data-mode="convert">Конвертация</button>
             <button class="mode-tab" data-mode="hash">Хэши</button>
+            <button class="mode-tab" data-mode="qr">QR-коды</button>
         </div>
 
         <!-- ===== CONVERT MODE ===== -->
@@ -28,7 +29,7 @@
                         <line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
                     <p class="drop-text">Перетащите файлы сюда</p>
-                    <p class="drop-hint">или нажмите для выбора (несколько файлов)</p>
+                    <p class="drop-hint">или нажмите для выбора (несколько файлов) &bull; Ctrl+V для вставки</p>
                     <input type="file" id="fileInput" multiple hidden>
                 </div>
             </div>
@@ -68,6 +69,26 @@
                             <option value="256k">256 kbps</option>
                             <option value="320k">320 kbps</option>
                         </select>
+                    </div>
+                    <div class="setting-row checkbox-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="cleanMetaCheck" checked>
+                            <span>Очистить метаданные (EXIF)</span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <label for="urlInput">Скачать и конвертировать по ссылке (YouTube/Файл):</label>
+                        <div class="url-input-group">
+                            <input type="url" id="urlInput" class="url-field" placeholder="https://example.com/file.pdf">
+                            <button class="btn-convert btn-url" id="convertUrlBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Скачать
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -119,6 +140,64 @@
                 <div class="hash-result-item"><span class="hash-label">MD5</span><code class="hash-value" id="hashMd5">—</code></div>
                 <div class="hash-result-item"><span class="hash-label">SHA-1</span><code class="hash-value" id="hashSha1">—</code></div>
                 <div class="hash-result-item"><span class="hash-label">SHA-256</span><code class="hash-value" id="hashSha256">—</code></div>
+            </div>
+        </div>
+
+        <!-- ===== QR MODE ===== -->
+        <div id="qrMode" class="mode-panel" style="display:none;">
+            <div class="qr-tabs">
+                <button class="qr-tab active" data-qr-mode="encode">Создать QR</button>
+                <button class="qr-tab" data-qr-mode="decode">Декодировать QR</button>
+            </div>
+
+            <div id="qrEncode" class="qr-subpanel">
+                <div class="setting-row">
+                    <label for="qrTextInput">Текст или URL для QR-кода:</label>
+                    <textarea class="hash-textarea" id="qrTextInput" placeholder="Введите текст или URL..." rows="3"></textarea>
+                </div>
+                <div class="qr-format-row">
+                    <label for="qrFormatSelect">Формат:</label>
+                    <select id="qrFormatSelect" class="qr-format-select">
+                        <option value="png">PNG</option>
+                        <option value="svg">SVG</option>
+                    </select>
+                </div>
+                <button class="btn-convert" id="qrEncodeBtn">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/>
+                        <rect x="7" y="14" width="3" height="3"/><rect x="14" y="14" width="3" height="3"/>
+                    </svg>
+                    Сгенерировать
+                </button>
+                <div class="qr-result-img" id="qrResultImg" style="display:none;">
+                    <img id="qrImage" alt="QR Code">
+                    <a class="btn-download" id="qrDownloadBtn" download>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Скачать
+                    </a>
+                </div>
+            </div>
+
+            <div id="qrDecode" class="qr-subpanel" style="display:none;">
+                <div class="hash-file-zone" id="qrFileZone">
+                    <input type="file" id="qrFileInput" accept="image/*" hidden>
+                    <span id="qrFileLabel">Загрузите изображение с QR-кодом</span>
+                </div>
+                <button class="btn-convert" id="qrDecodeBtn">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    Декодировать
+                </button>
+                <div class="qr-decode-result" id="qrDecodeResult" style="display:none;">
+                    <label>Результат:</label>
+                    <textarea class="hash-textarea" id="qrDecodedText" readonly rows="3"></textarea>
+                </div>
             </div>
         </div>
     </div>

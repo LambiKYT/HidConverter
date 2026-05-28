@@ -588,3 +588,209 @@ h1 {
     .btn-convert { justify-content: center; }
     h1 { font-size: 1.6rem; }
 }
+
+/* ===== Checkbox Row ===== */
+
+.checkbox-row label {
+    cursor: pointer;
+}
+
+.checkbox-label {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem !important;
+    color: var(--text-primary) !important;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.checkbox-label input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+    background-size: 12px;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* ===== URL Input Group ===== */
+
+.url-input-group {
+    display: flex;
+    gap: 8px;
+}
+
+.url-field {
+    flex: 1;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.url-field:focus {
+    border-color: var(--accent);
+}
+
+.btn-url {
+    padding: 10px 16px !important;
+    font-size: 0.85rem !important;
+    flex-shrink: 0;
+}
+
+/* ===== File Preview (thumbnails + audio) ===== */
+
+.file-preview {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.file-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.file-preview audio {
+    width: 40px;
+    height: 40px;
+}
+
+.file-preview audio::-webkit-media-controls-panel {
+    background: var(--bg-card);
+}
+
+.file-preview audio::-webkit-media-controls-enclosure {
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+/* ===== QR Mode ===== */
+
+.qr-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    margin-bottom: 20px;
+}
+
+.qr-tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.qr-tab.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.qr-tab:hover:not(.active) {
+    color: var(--text-primary);
+}
+
+.qr-subpanel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.qr-format-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.qr-format-row label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.qr-format-select {
+    width: 120px;
+    padding: 8px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    outline: none;
+}
+
+.qr-format-select:focus {
+    border-color: var(--accent);
+}
+
+#qrMode .btn-convert {
+    justify-content: center;
+}
+
+.qr-result-img {
+    text-align: center;
+    animation: fadeIn 0.4s ease;
+}
+
+.qr-result-img img {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+}
+
+.qr-decode-result {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: fadeIn 0.4s ease;
+}
+
+.qr-decode-result label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.qr-decode-result .hash-textarea {
+    min-height: 80px;
+}
+
+/* ===== File list with preview ===== */
+
+.file-list-item .file-preview + .file-body {
+    margin-left: 0;
+}
