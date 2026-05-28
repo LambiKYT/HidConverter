@@ -5,7 +5,8 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.converters import ImageConverter, AudioConverter, VideoConverter, DocumentConverter
@@ -13,6 +14,8 @@ from backend.utils import (
     validate_file_size, validate_extension, get_category,
     cleanup_uploads, MAX_FILE_SIZE_BYTES,
 )
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,6 +56,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    return (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
 
 
 @app.get("/api/formats")
@@ -110,9 +120,12 @@ async def convert_file(
 
     try:
         output_path = converter.convert(str(input_path), target_format, str(job_dir))
+    except ValueError as e:
+        logger.error(f"Conversion validation error: {e}")
+        return JSONResponse(status_code=422, content={"error": f"Ошибка в данных: {e}"})
     except Exception as e:
         logger.error(f"Conversion failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return JSONResponse(status_code=422, content={"error": f"Ошибка конвертации: {e}"})
 
     background_tasks.add_task(cleanup_uploads, str(UPLOAD_DIR))
 
@@ -120,6 +133,15 @@ async def convert_file(
         output_path,
         filename=os.path.basename(output_path),
         media_type="application/octet-stream",
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.error(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"error": f"Внутренняя ошибка сервера: {exc}"},
     )
 
 

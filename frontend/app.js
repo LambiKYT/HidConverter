@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "/api";
 
 const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileInput");
@@ -86,6 +86,7 @@ function selectFile(file) {
     fileInfo.style.display = "flex";
     resultSection.style.display = "none";
     progressSection.style.display = "none";
+    dropZone.classList.remove("success");
 
     const ext = getExtension(file.name);
     populateFormats(ext);
@@ -100,6 +101,20 @@ function resetUI() {
     progressSection.style.display = "none";
     resultSection.style.display = "none";
     progressFill.style.width = "0%";
+    progressText.className = "progress-text";
+    progressText.textContent = "";
+    dropZone.classList.remove("success");
+}
+
+function showProgressError(msg) {
+    progressText.className = "progress-text progress-error";
+    progressText.textContent = msg;
+}
+
+function setProgress(pct, label) {
+    progressFill.style.width = pct + "%";
+    progressText.className = "progress-text";
+    progressText.textContent = label;
 }
 
 // --- Drag & Drop ---
@@ -143,8 +158,8 @@ convertBtn.addEventListener("click", async () => {
     convertBtn.disabled = true;
     progressSection.style.display = "block";
     resultSection.style.display = "none";
-    progressFill.style.width = "0%";
-    progressText.textContent = "Загрузка...";
+    dropZone.classList.remove("success");
+    setProgress(0, "Загрузка...");
 
     const formData = new FormData();
     formData.append("file", selectedFile);
@@ -157,27 +172,29 @@ convertBtn.addEventListener("click", async () => {
             xhr.upload.addEventListener("progress", (e) => {
                 if (e.lengthComputable) {
                     const pct = Math.round((e.loaded / e.total) * 80);
-                    progressFill.style.width = pct + "%";
-                    if (pct < 80) progressText.textContent = `Загрузка... ${pct}%`;
+                    setProgress(pct, `Загрузка... ${pct}%`);
                 }
             });
 
             xhr.addEventListener("loadstart", () => {
-                progressFill.style.width = "0%";
+                setProgress(0, "Загрузка...");
             });
 
             xhr.addEventListener("load", () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
-                    progressFill.style.width = "100%";
-                    progressText.textContent = "Обработка завершена!";
+                    setProgress(100, "Обработка завершена!");
                     resolve(xhr.response);
                 } else {
-                    let msg = "Ошибка конвертации";
-                    try {
-                        const err = JSON.parse(xhr.responseText);
-                        msg = err.detail || msg;
-                    } catch {}
-                    reject(new Error(msg));
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        let msg = "Ошибка конвертации";
+                        try {
+                            const err = JSON.parse(reader.result);
+                            msg = err.error || err.detail || msg;
+                        } catch {}
+                        reject(new Error(msg));
+                    };
+                    reader.readAsText(xhr.response);
                 }
             });
 
@@ -198,11 +215,11 @@ convertBtn.addEventListener("click", async () => {
         downloadBtn.href = url;
         downloadBtn.download = outName;
 
+        dropZone.classList.add("success");
+        setProgress(100, "Успешно сконвертировано!");
         resultSection.style.display = "block";
-        progressSection.style.display = "none";
     } catch (err) {
-        progressSection.style.display = "none";
-        showError(err.message);
+        showProgressError(err.message);
     } finally {
         convertBtn.disabled = false;
     }

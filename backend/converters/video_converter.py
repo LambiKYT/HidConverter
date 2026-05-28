@@ -37,7 +37,8 @@ class VideoConverter(BaseConverter):
 
         if target_format == "mp3":
             cmd = [
-                "ffmpeg", "-y", "-i", file_path,
+                "ffmpeg", "-y",
+                "-i", file_path,
                 "-vn", "-acodec", "libmp3lame",
                 "-loglevel", "error",
                 output_path
@@ -45,14 +46,15 @@ class VideoConverter(BaseConverter):
         else:
             vcodec = self.VIDEO_CODEC_MAP.get(target_format, "libx264")
             cmd = [
-                "ffmpeg", "-y", "-i", file_path,
+                "ffmpeg", "-y",
+                "-i", file_path,
                 "-vcodec", vcodec,
                 "-acodec", "aac",
                 "-loglevel", "error",
                 output_path
             ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
         if result.returncode != 0:
             raise RuntimeError(f"FFmpeg error: {result.stderr.strip()}")
 

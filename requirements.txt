@@ -5,5 +5,5 @@ Pillow==11.1.0
 python-docx==1.1.2
 openpyxl==3.1.5
 pdfplumber==0.11.4
-weasyprint==63.1
+fpdf2==2.8.2
 markdown==3.7

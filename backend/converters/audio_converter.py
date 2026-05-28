@@ -44,13 +44,14 @@ class AudioConverter(BaseConverter):
         codec = self.CODEC_MAP.get(target_format, target_format)
 
         cmd = [
-            "ffmpeg", "-y", "-i", file_path,
+            "ffmpeg", "-y",
+            "-i", file_path,
             "-acodec", codec,
             "-loglevel", "error",
             output_path
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
         if result.returncode != 0:
             raise RuntimeError(f"FFmpeg error: {result.stderr.strip()}")
 
