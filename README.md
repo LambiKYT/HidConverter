@@ -1,73 +1,157 @@
-# HidConverter
+# 🌀 HidConverter
 
-Универсальный веб-конвертер файлов. Загружайте файлы через браузер и конвертируйте их в нужный формат.
+**Универсальный асинхронный медиа-комбайн** — конвертируйте всё, что угодно, прямо из браузера.  
+Изображения, аудио, видео, документы, QR-коды, хэши — единый API + PWA-интерфейс.
 
-## Возможности
+---
 
-- **Изображения:** PNG, JPG, WEBP, BMP, GIF, ICO (взаимная конвертация + оптимизация)
-- **Аудио:** MP3, WAV, OGG, FLAC, M4A, AAC
-- **Видео:** MP4, AVI, MKV, MOV, WEBM (+ извлечение аудио в MP3)
-- **Документы:** PDF ↔ DOCX, PDF → TXT, TXT/MD → PDF, XLSX → CSV/PDF
+## Ключевые возможности
+
+### 🔄 Конвертация файлов
+| Категория | Входные форматы | Выходные форматы |
+|-----------|----------------|------------------|
+| **Изображения** | PNG, JPG, WEBP, BMP, GIF, ICO | PNG → JPG, WEBP, BMP, GIF, ICO и все взаимные комбинации |
+| **Аудио** | MP3, WAV, OGG, FLAC, M4A, AAC | Полная взаимная конвертация с настройкой битрейта |
+| **Видео** | MP4, AVI, MKV, MOV, WEBM | Взаимная конвертация + извлечение аудиодорожки в MP3 |
+| **Документы** | PDF, DOCX, TXT, MD, XLSX, CSV | PDF ↔ DOCX, PDF → TXT, TXT/MD → PDF, XLSX → CSV/PDF |
+| **Данные** | JSON, YAML, XML | Взаимная конвертация текстовых матриц |
+
+### 📦 Пакетная обработка
+- Загружайте несколько файлов одновременно
+- Автоматическая упаковка результата в ZIP
+- Индикатор прогресса загрузки по каждому файлу
+
+### 🛡 Безопасность и приватность
+- **Очистка EXIF-метаданных** — удаление GPS-координат, даты съёмки, модели устройства из изображений перед конвертацией
+- **Хэширование** — вычисление MD5, SHA-1, SHA-256 для файлов и текста
+
+### 📱 QR-коды
+- **Генерация:** текст/URL → QR-код в PNG или SVG
+- **Декодирование:** загрузите изображение с QR-кодом → получите текст
+
+### 🌐 Сетевые утилиты
+- **Конвертация по URL** — передайте прямую ссылку на файл, бэкенд скачает и сконвертирует
+- **YouTube→MP3/WAV** — вставьте ссылку на YouTube, получите аудиодорожку в максимальном качестве
+
+### ⌨️ Умный интерфейс
+- **Ctrl+V из буфера обмена** — вставьте скриншот или скопированный текст, и они мгновенно появятся в списке файлов
+- **Предпросмотр** — миниатюры для изображений и встроенный аудиоплеер прямо в списке файлов
+- **PWA (Progressive Web App)** — установите как приложение на телефон или ПК, работает офлайн
+
+### ⚙️ Тонкая настройка
+- Качество сжатия (1–100 %)
+- Битрейт аудио (128–320 kbps)
+- Флаг очистки метаданных
+
+---
 
 ## Быстрый старт
 
-### 1. Установка зависимостей
+### Способ 1: Классический (через виртуальное окружение)
+
+**Требования:** Python 3.10+, FFmpeg, Git
 
 ```bash
+# 1. Клонируйте репозиторий
+git clone https://github.com/your-username/hidconverter.git
+cd hidconverter
+
+# 2. Создайте и активируйте виртуальное окружение
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+
+# 3. Установите зависимости
 pip install -r requirements.txt
+
+# 4. Установите FFmpeg (если ещё не установлен)
+# Windows: winget install ffmpeg  или  https://ffmpeg.org/
+# macOS:   brew install ffmpeg
+# Linux:   sudo apt install ffmpeg
+
+# 5. Запустите сервер
+uvicorn backend.main:app --reload --port 8000
 ```
 
-Также требуется установить **FFmpeg** (для аудио/видео конвертации):
-- **Windows:** `winget install ffmpeg` или скачайте с [ffmpeg.org](https://ffmpeg.org/)
-- **macOS:** `brew install ffmpeg`
-- **Linux:** `sudo apt install ffmpeg`
+Откройте **http://localhost:8000** в браузере.  
+Swagger-документация: **http://localhost:8000/docs**
 
-### 2. Запуск бэкенда
+### Способ 2: Современный (через Docker)
+
+**Требования:** Docker, Docker Compose
 
 ```bash
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+# Одна команда — и всё работает
+docker-compose up --build
 ```
 
-Swagger-документация: http://localhost:8000/docs
+Откройте **http://localhost:8000**.  
+FFmpeg и все системные зависимости уже установлены внутри контейнера.
 
-### 3. Открыть фронтенд
+---
 
-Откройте `frontend/index.html` в браузере (или через Live Server).
-
-## API
+## API Endpoints
 
 | Метод | Эндпоинт | Описание |
 |-------|----------|----------|
-| GET | `/api/categories` | Список категорий и расширений |
-| GET | `/api/formats` | Матрица поддерживаемых конвертаций |
-| POST | `/api/convert` | Конвертировать файл (multipart: `file` + `target_format`) |
+| `GET` | `/api/categories` | Список категорий и поддерживаемых расширений |
+| `GET` | `/api/formats` | Матрица конвертаций «из → в» для каждой категории |
+| `POST` | `/api/convert` | Конвертация загруженных файлов |
+| `POST` | `/api/convert-url` | Скачивание файла по URL и конвертация |
+| `POST` | `/api/hash` | Хэширование файла или текста (MD5, SHA-1, SHA-256) |
+| `POST` | `/api/qr/encode` | Генерация QR-кода из текста |
+| `POST` | `/api/qr/decode` | Декодирование QR-кода из изображения |
+| `POST` | `/api/metadata/clean` | Очистка EXIF-метаданных изображения |
+
+---
 
 ## Структура проекта
 
 ```
 HidConverter/
 ├── backend/
-│   ├── __init__.py
-│   ├── main.py            # FastAPI приложение
-│   ├── utils.py           # Валидация, очистка
+│   ├── main.py                     # FastAPI-приложение (все эндпоинты)
+│   ├── utils.py                    # Валидация, разрешённые расширения, очистка uploads
 │   └── converters/
-│       ├── __init__.py
-│       ├── base.py        # Абстрактный базовый класс
-│       ├── image_converter.py
-│       ├── audio_converter.py
-│       ├── video_converter.py
-│       └── document_converter.py
+│       ├── __init__.py             # Экспорт всех конвертеров
+│       ├── base.py                 # Абстрактный базовый класс конвертера
+│       ├── image_converter.py      # Изображения (Pillow)
+│       ├── audio_converter.py      # Аудио (FFmpeg)
+│       ├── video_converter.py      # Видео (FFmpeg)
+│       ├── document_converter.py   # Документы (python-docx, openpyxl, fpdf2, pdfplumber)
+│       ├── data_converter.py       # Текстовые матрицы (PyYAML, xmltodict)
+│       ├── hash_converter.py       # Хэши (hashlib)
+│       ├── metadata_cleaner.py     # Очистка EXIF/GPS из изображений
+│       ├── qr_converter.py         # Генерация и декодирование QR-кодов
+│       └── network_converter.py    # Скачивание по URL, YouTube → аудио
 ├── frontend/
-│   ├── index.html
-│   ├── style.css
-│   └── app.js
-├── uploads/               # Временные файлы (автоочистка)
-├── requirements.txt
+│   ├── index.html                  # PWA-интерфейс
+│   ├── style.css                   # Тёмная тема, адаптивная вёрстка
+│   ├── app.js                      # Вся клиентская логика
+│   ├── manifest.json               # PWA-манифест
+│   ├── sw.js                       # Service Worker (кэширование, офлайн)
+│   └── icon.svg                    # Иконка приложения
+├── uploads/                        # Временные файлы (автоматическая очистка)
+├── Dockerfile                      # Production-контейнер
+├── docker-compose.yml              # Оркестрация одной командой
+├── requirements.txt                # Python-зависимости
 └── .gitignore
 ```
 
-## Добавление нового формата
+---
 
-1. Добавьте расширение в `ALLOWED_EXTENSIONS` и `FILE_CATEGORIES` в `backend/utils.py`
-2. Пропишите конвертацию в соответствующем конвертере (или создайте новый)
-3. Обновите матрицу `SUPPORTED` в конвертере
+## Технологический стек
+
+- **Backend:** Python 3.12, FastAPI, Uvicorn
+- **Медиа:** FFmpeg, Pillow, yt-dlp
+- **Документы:** python-docx, openpyxl, pdfplumber, fpdf2
+- **Данные:** PyYAML, xmltodict, Markdown
+- **QR:** qrcode, pyzbar
+- **Фронтенд:** Vanilla JS, CSS (темная тема), PWA (Service Worker + Manifest)
+- **Инфраструктура:** Docker, Docker Compose
+
+---
+
+## Лицензия
+
+MIT

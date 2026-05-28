@@ -1,0 +1,9 @@
+services:
+  hidconverter:
+    build: .
+    container_name: hidconverter
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+    restart: always

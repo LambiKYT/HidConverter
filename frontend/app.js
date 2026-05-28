@@ -571,5 +571,10 @@ qrDecodeBtn.addEventListener("click", async () => {
     }
 });
 
+// --- Service Worker ---
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+}
+
 // --- Init ---
 loadFormatData();
