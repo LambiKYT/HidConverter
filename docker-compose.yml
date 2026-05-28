@@ -5,5 +5,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./uploads:/app/uploads
-    restart: always
+      # Mount source code so changes reflect on rebuild without full COPY
+      - .:/app
+      # Named volume for uploads (persists across restarts)
+      - uploads_data:/app/uploads
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+volumes:
+  uploads_data:

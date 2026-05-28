@@ -1,0 +1,45 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Tests & coverage
+.pytest_cache/
+htmlcov/
+*.coverage
+
+# Runtime data
+uploads/
+!uploads/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Environment
+.env
+*.env.local
+
+# Documentation
+README.md

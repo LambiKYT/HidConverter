@@ -23,8 +23,8 @@ class ImageConverter(BaseConverter):
         if ext not in self.SUPPORTED or target_format not in self.SUPPORTED[ext]:
             raise ValueError(f"Conversion from {ext} to {target_format} is not supported")
 
-        img = Image.open(file_path)
-        img = img.convert("RGBA") if target_format in ("png", "ico", "gif", "webp") else img.convert("RGB")
+        with Image.open(file_path) as img:
+            img = img.convert("RGBA") if target_format in ("png", "ico", "gif", "webp") else img.convert("RGB")
 
         output_path = self.get_output_path(file_path, target_format, output_dir)
 

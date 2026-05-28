@@ -24,7 +24,41 @@ from backend.utils import (
     cleanup_uploads, MAX_FILE_SIZE_BYTES,
 )
 
+CHUNK_SIZE = 1024 * 1024  # 1 MB
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    size = 0
+    chunks = []
+    while True:
+        chunk = await file.read(CHUNK_SIZE)
+        if not chunk:
+            break
+        size += len(chunk)
+        if not validate_file_size(size):
+            raise HTTPException(status_code=413, detail=f"File too large. Max: {MAX_FILE_SIZE_BYTES // (1024*1024)} MB")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+
+CONTENT_TYPE_MAP = {
+    "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+    "webp": "image/webp", "bmp": "image/bmp", "gif": "image/gif",
+    "ico": "image/x-icon",
+    "mp3": "audio/mpeg", "wav": "audio/wav", "ogg": "audio/ogg",
+    "flac": "audio/flac", "m4a": "audio/mp4", "aac": "audio/aac",
+    "mp4": "video/mp4", "webm": "video/webm",
+    "pdf": "application/pdf", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "txt": "text/plain", "md": "text/markdown", "csv": "text/csv",
+    "json": "application/json", "xml": "application/xml", "yaml": "application/x-yaml",
+    "zip": "application/zip",
+}
+
+
+def _content_type(ext: str) -> str:
+    return CONTENT_TYPE_MAP.get(ext.lstrip(".").lower(), "application/octet-stream")
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,8 +80,11 @@ converters = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("HidConverter started")
     cleanup_uploads(str(UPLOAD_DIR))
+    logger.info("=" * 50)
+    logger.info("🚀 HidConverter Backend успешно запущен в Docker!")
+    logger.info("💻 Локальная ссылка для Windows: http://localhost:8000")
+    logger.info("=" * 50)
     yield
     cleanup_uploads(str(UPLOAD_DIR))
     logger.info("HidConverter stopped")
@@ -99,10 +136,6 @@ async def _convert_single(file: UploadFile, target_format: str, job_dir: Path,
     if not validate_extension(ext):
         raise HTTPException(status_code=400, detail=f"Unsupported extension: .{ext}")
 
-    contents = await file.read()
-    if not validate_file_size(len(contents)):
-        raise HTTPException(status_code=413, detail=f"File too large. Max: {MAX_FILE_SIZE_BYTES // (1024*1024)} MB")
-
     category = get_category(ext)
     converter = converters.get(category)
     if not converter:
@@ -113,6 +146,12 @@ async def _convert_single(file: UploadFile, target_format: str, job_dir: Path,
         raise HTTPException(status_code=400, detail=f"Conversion .{ext} -> .{target_format} not supported")
 
     input_path = job_dir / f"input.{ext}"
+    try:
+        contents = await _read_upload(file)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Read error: {e}")
     with open(input_path, "wb") as f:
         f.write(contents)
 
@@ -154,7 +193,7 @@ async def convert_files(
     if len(files) == 1:
         output_path = await _convert_single(files[0], target_format, job_dir, quality, bitrate, clean_meta)
         out_name = os.path.basename(output_path)
-        return FileResponse(output_path, filename=out_name, media_type="application/octet-stream")
+        return FileResponse(output_path, filename=out_name, media_type=_content_type(target_format))
 
     zip_buffer = io.BytesIO()
     used_names = set()
@@ -180,7 +219,7 @@ async def convert_files(
     with open(zip_path, "wb") as f:
         f.write(zip_buffer.getvalue())
 
-    return FileResponse(zip_path, filename="converted.zip", media_type="application/zip")
+    return FileResponse(zip_path, filename="converted.zip", media_type=_content_type("zip"))
 
 
 @app.post("/api/convert-url")
@@ -218,7 +257,7 @@ async def convert_url(
         try:
             output_path = download_youtube_audio(url, str(job_dir), target_format)
             out_name = os.path.basename(output_path)
-            return FileResponse(output_path, filename=out_name, media_type="application/octet-stream")
+            return FileResponse(output_path, filename=out_name, media_type=_content_type(target_format))
         except RuntimeError as e:
             raise HTTPException(status_code=422, detail=str(e))
 
@@ -245,7 +284,7 @@ async def convert_url(
     try:
         output_path = converter.convert(downloaded_path, target_format, str(job_dir), **kwargs)
         out_name = os.path.basename(output_path)
-        return FileResponse(output_path, filename=out_name, media_type="application/octet-stream")
+        return FileResponse(output_path, filename=out_name, media_type=_content_type(target_format))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"Ошибка в данных: {e}")
     except Exception as e:
@@ -258,9 +297,7 @@ async def hash_file(
     text: Optional[str] = Form(None),
 ):
     if file:
-        contents = await file.read()
-        if not validate_file_size(len(contents)):
-            raise HTTPException(status_code=413, detail="File too large")
+        contents = await _read_upload(file)
         data = contents
         source = file.filename
     elif text:
@@ -308,9 +345,7 @@ async def qr_encode(
 async def qr_decode(
     file: UploadFile = File(...),
 ):
-    contents = await file.read()
-    if not validate_file_size(len(contents)):
-        raise HTTPException(status_code=413, detail="File too large")
+    contents = await _read_upload(file)
 
     job_id = uuid.uuid4().hex
     job_dir = UPLOAD_DIR / job_id
@@ -336,9 +371,7 @@ async def qr_decode(
 async def metadata_clean(
     file: UploadFile = File(...),
 ):
-    contents = await file.read()
-    if not validate_file_size(len(contents)):
-        raise HTTPException(status_code=413, detail="File too large")
+    contents = await _read_upload(file)
 
     job_id = uuid.uuid4().hex
     job_dir = UPLOAD_DIR / job_id

@@ -209,6 +209,63 @@ async def test_global_exception_handler(client: AsyncClient):
     assert "error" in body or "detail" in body
 
 
+# ─── Edge cases ─────────────────────────────────────────────────────────────
+
+async def test_convert_empty_file(client: AsyncClient):
+    data = {"target_format": "jpg"}
+    files = {"files": ("empty.png", b"", "image/png")}
+    response = await client.post("/api/convert", files=files, data=data)
+    assert response.status_code in (400, 422)
+    body = response.json()
+    assert "error" in body or "detail" in body
+
+
+async def test_convert_corrupted_image(client: AsyncClient):
+    data = {"target_format": "jpg"}
+    files = {"files": ("corrupt.png", b"not-a-real-png-file", "image/png")}
+    response = await client.post("/api/convert", files=files, data=data)
+    assert response.status_code in (400, 422, 500)
+    body = response.json()
+    assert "error" in body or "detail" in body
+
+
+async def test_convert_filename_with_path_traversal(client: AsyncClient):
+    png_bytes = _make_test_png()
+    files = {"files": ("../../etc/passwd.png", png_bytes, "image/png")}
+    data = {"target_format": "jpg"}
+    response = await client.post("/api/convert", files=files, data=data)
+    assert response.status_code == 200
+    assert len(response.content) > 0
+
+
+async def test_content_type_single_file(client: AsyncClient):
+    png_bytes = _make_test_png()
+    files = {"files": ("test.png", png_bytes, "image/png")}
+    data = {"target_format": "jpg", "quality": "85"}
+    response = await client.post("/api/convert", files=files, data=data)
+    assert response.status_code == 200
+    ct = response.headers.get("content-type", "")
+    assert "jpeg" in ct or "octet-stream" in ct
+
+
+async def test_qr_encode_empty_text(client: AsyncClient):
+    from backend.converters.qr_converter import qrcode
+    if qrcode is None:
+        pytest.skip("qrcode library not installed")
+    data = {"text": "", "fmt": "png"}
+    response = await client.post("/api/qr/encode", data=data)
+    assert response.status_code in (200, 422)
+
+
+async def test_large_file_rejection(client: AsyncClient, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("backend.utils.MAX_FILE_SIZE_BYTES", 100)
+    large = b"x" * 101
+    files = {"files": ("big.txt", large, "text/plain")}
+    data = {"target_format": "pdf"}
+    response = await client.post("/api/convert", files=files, data=data)
+    assert response.status_code == 413
+
+
 def _make_test_png() -> bytes:
     from PIL import Image
     buf = io.BytesIO()
