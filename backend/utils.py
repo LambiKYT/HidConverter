@@ -5,7 +5,7 @@ from pathlib import Path
 
 logger = logging.getLogger("hidconverter")
 
-MAX_FILE_SIZE_MB = 200
+MAX_FILE_SIZE_MB = 2000
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {
