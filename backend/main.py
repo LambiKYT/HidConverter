@@ -157,11 +157,20 @@ async def convert_files(
         return FileResponse(output_path, filename=out_name, media_type="application/octet-stream")
 
     zip_buffer = io.BytesIO()
+    used_names = set()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for file in files:
             try:
                 output_path = await _convert_single(file, target_format, job_dir, quality, bitrate, clean_meta)
-                zf.write(output_path, arcname=os.path.basename(output_path))
+                base = os.path.basename(output_path)
+                stem, ext = os.path.splitext(base)
+                arcname = base
+                counter = 1
+                while arcname in used_names:
+                    arcname = f"{stem}_{counter}{ext}"
+                    counter += 1
+                used_names.add(arcname)
+                zf.write(output_path, arcname=arcname)
             except HTTPException as e:
                 logger.warning(f"Skipping {file.filename}: {e.detail}")
                 continue
