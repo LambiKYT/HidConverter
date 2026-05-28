@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Any
 
 
 class BaseConverter(ABC):
     @abstractmethod
-    def convert(self, file_path: str, target_format: str, output_dir: str) -> str:
+    def convert(self, file_path: str, target_format: str, output_dir: str, **kwargs) -> str:
         ...
 
     @abstractmethod

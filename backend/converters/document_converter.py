@@ -67,7 +67,7 @@ class DocumentConverter(BaseConverter):
     def supported_conversions(self) -> Dict[str, List[str]]:
         return self.SUPPORTED
 
-    def convert(self, file_path: str, target_format: str, output_dir: str) -> str:
+    def convert(self, file_path: str, target_format: str, output_dir: str, **kwargs) -> str:
         ext = os.path.splitext(file_path)[1].lstrip(".").lower()
         if ext not in self.SUPPORTED or target_format not in self.SUPPORTED[ext]:
             raise ValueError(f"Conversion from {ext} to {target_format} is not supported")

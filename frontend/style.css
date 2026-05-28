@@ -31,19 +31,20 @@ html, body {
 
 body {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 20px;
+    padding: 40px 20px;
+    min-height: 100vh;
 }
 
 .container {
     width: 100%;
-    max-width: 540px;
-    text-align: center;
+    max-width: 580px;
 }
 
 header {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
+    text-align: center;
 }
 
 h1 {
@@ -61,14 +62,49 @@ h1 {
     font-size: 0.9rem;
 }
 
+/* ===== Mode Tabs ===== */
+
+.mode-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    margin-bottom: 24px;
+}
+
+.mode-tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mode-tab.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.mode-tab:hover:not(.active) {
+    color: var(--text-primary);
+}
+
+/* ===== Drop Zone ===== */
+
 .drop-zone {
     background: var(--bg-card);
     border: 2px dashed var(--border);
     border-radius: var(--radius);
-    padding: 40px 20px;
+    padding: 36px 20px;
     cursor: pointer;
     transition: all 0.3s ease;
-    position: relative;
+    text-align: center;
 }
 
 .drop-zone:hover,
@@ -104,39 +140,53 @@ h1 {
     margin-top: 4px;
 }
 
-.file-info {
+/* ===== File List ===== */
+
+.file-list {
+    margin-top: 16px;
     display: flex;
-    align-items: center;
-    gap: 12px;
-    text-align: left;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.file-icon {
+.file-list-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    transition: border-color 0.2s;
+}
+
+.file-list-item .file-icon {
     color: var(--accent);
     flex-shrink: 0;
 }
 
-.file-details {
+.file-list-item .file-body {
     flex: 1;
     min-width: 0;
 }
 
-.file-name {
+.file-list-item .file-name {
     display: block;
     font-weight: 500;
+    font-size: 0.9rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.file-size {
+.file-list-item .file-size {
     display: block;
     color: var(--text-secondary);
-    font-size: 0.8rem;
-    margin-top: 2px;
+    font-size: 0.75rem;
+    margin-top: 1px;
 }
 
-.btn-remove {
+.file-list-item .btn-remove {
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -147,10 +197,12 @@ h1 {
     flex-shrink: 0;
 }
 
-.btn-remove:hover {
+.file-list-item .btn-remove:hover {
     color: var(--error);
     background: rgba(239, 68, 68, 0.1);
 }
+
+/* ===== Controls ===== */
 
 .controls {
     margin-top: 20px;
@@ -195,6 +247,7 @@ h1 {
 .btn-convert {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     padding: 10px 24px;
     background: var(--accent);
@@ -221,6 +274,92 @@ h1 {
     transform: none;
 }
 
+/* ===== Settings Panel ===== */
+
+.settings-panel {
+    margin-top: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.settings-toggle:hover {
+    color: var(--text-primary);
+}
+
+.settings-body {
+    padding: 0 14px 14px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.settings-panel.open .settings-body {
+    display: flex;
+}
+
+.setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.setting-row label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.setting-row input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+}
+
+.setting-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+}
+
+.setting-row select {
+    padding: 8px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.setting-row select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* ===== Progress ===== */
+
 .progress-section {
     margin-top: 24px;
 }
@@ -245,6 +384,7 @@ h1 {
     color: var(--text-secondary);
     font-size: 0.85rem;
     margin-top: 8px;
+    text-align: center;
 }
 
 .progress-error {
@@ -252,9 +392,12 @@ h1 {
     font-weight: 500;
 }
 
+/* ===== Result ===== */
+
 .result-section {
     margin-top: 24px;
     animation: fadeIn 0.4s ease;
+    text-align: center;
 }
 
 .result-success svg {
@@ -307,6 +450,109 @@ h1 {
     color: var(--accent);
 }
 
+/* ===== Hash Mode ===== */
+
+.hash-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.hash-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: 'Courier New', monospace;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.hash-textarea:focus {
+    border-color: var(--accent);
+}
+
+.hash-or {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.hash-file-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    background: var(--bg-card);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.hash-file-zone:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.hash-file-zone.has-file {
+    border-color: var(--accent);
+    color: var(--accent);
+    border-style: solid;
+}
+
+#hashMode .btn-convert {
+    width: 100%;
+    justify-content: center;
+}
+
+.hash-results {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: fadeIn 0.4s ease;
+}
+
+.hash-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+}
+
+.hash-label {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 60px;
+}
+
+.hash-value {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    word-break: break-all;
+    user-select: all;
+}
+
+/* ===== Error Toast ===== */
+
 .error-toast {
     position: fixed;
     bottom: 30px;
@@ -336,18 +582,9 @@ h1 {
     to { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 480px) {
-    .container {
-        max-width: 100%;
-    }
-    .controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .btn-convert {
-        justify-content: center;
-    }
-    h1 {
-        font-size: 1.6rem;
-    }
+@media (max-width: 500px) {
+    .container { max-width: 100%; }
+    .controls { flex-direction: column; align-items: stretch; }
+    .btn-convert { justify-content: center; }
+    h1 { font-size: 1.6rem; }
 }

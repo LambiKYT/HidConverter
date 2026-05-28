@@ -1,15 +1,22 @@
 import os
+import io
+import json
 import logging
 import uuid
+import zipfile
 from pathlib import Path
 from contextlib import asynccontextmanager
+from typing import List, Optional
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.converters import ImageConverter, AudioConverter, VideoConverter, DocumentConverter
+from backend.converters import (
+    ImageConverter, AudioConverter, VideoConverter,
+    DocumentConverter, DataConverter, HashConverter,
+)
 from backend.utils import (
     validate_file_size, validate_extension, get_category,
     cleanup_uploads, MAX_FILE_SIZE_BYTES,
@@ -31,6 +38,7 @@ converters = {
     "audio": AudioConverter(),
     "video": VideoConverter(),
     "document": DocumentConverter(),
+    "data": DataConverter(),
 }
 
 
@@ -46,7 +54,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HidConverter",
     description="Universal file conversion API",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -79,24 +87,18 @@ async def get_categories():
     return FILE_CATEGORIES
 
 
-@app.post("/api/convert")
-async def convert_file(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    target_format: str = Form(...),
-):
+async def _convert_single(file: UploadFile, target_format: str, job_dir: Path,
+                          quality: Optional[int] = None,
+                          bitrate: Optional[str] = None) -> str:
     ext = os.path.splitext(file.filename or "")[1].lstrip(".").lower()
-    logger.info(f"Received file: {file.filename}, target: {target_format}")
+    logger.info(f"Converting: {file.filename} (.{ext}) -> {target_format}")
 
     if not validate_extension(ext):
-        raise HTTPException(status_code=400, detail=f"Unsupported file extension: .{ext}")
+        raise HTTPException(status_code=400, detail=f"Unsupported extension: .{ext}")
 
     contents = await file.read()
     if not validate_file_size(len(contents)):
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Max size: {MAX_FILE_SIZE_BYTES // (1024*1024)} MB",
-        )
+        raise HTTPException(status_code=413, detail=f"File too large. Max: {MAX_FILE_SIZE_BYTES // (1024*1024)} MB")
 
     category = get_category(ext)
     converter = converters.get(category)
@@ -105,35 +107,87 @@ async def convert_file(
 
     conv_map = converter.supported_conversions()
     if ext not in conv_map or target_format not in conv_map[ext]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Conversion from .{ext} to .{target_format} is not supported",
-        )
-
-    job_id = uuid.uuid4().hex
-    job_dir = UPLOAD_DIR / job_id
-    job_dir.mkdir(parents=True, exist_ok=True)
+        raise HTTPException(status_code=400, detail=f"Conversion .{ext} -> .{target_format} not supported")
 
     input_path = job_dir / f"input.{ext}"
     with open(input_path, "wb") as f:
         f.write(contents)
 
-    try:
-        output_path = converter.convert(str(input_path), target_format, str(job_dir))
-    except ValueError as e:
-        logger.error(f"Conversion validation error: {e}")
-        return JSONResponse(status_code=422, content={"error": f"Ошибка в данных: {e}"})
-    except Exception as e:
-        logger.error(f"Conversion failed: {e}")
-        return JSONResponse(status_code=422, content={"error": f"Ошибка конвертации: {e}"})
+    kwargs = {}
+    if quality is not None:
+        kwargs["quality"] = quality
+    if bitrate is not None:
+        kwargs["bitrate"] = bitrate
 
+    try:
+        return converter.convert(str(input_path), target_format, str(job_dir), **kwargs)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Ошибка в данных: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Ошибка конвертации: {e}")
+
+
+@app.post("/api/convert")
+async def convert_files(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] = File(...),
+    target_format: str = Form(...),
+    quality: Optional[int] = Form(None),
+    bitrate: Optional[str] = Form(None),
+):
+    job_id = uuid.uuid4().hex
+    job_dir = UPLOAD_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
     background_tasks.add_task(cleanup_uploads, str(UPLOAD_DIR))
 
-    return FileResponse(
-        output_path,
-        filename=os.path.basename(output_path),
-        media_type="application/octet-stream",
-    )
+    if len(files) == 1:
+        output_path = await _convert_single(files[0], target_format, job_dir, quality, bitrate)
+        out_name = os.path.basename(output_path)
+        return FileResponse(output_path, filename=out_name, media_type="application/octet-stream")
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file in files:
+            try:
+                output_path = await _convert_single(file, target_format, job_dir, quality, bitrate)
+                zf.write(output_path, arcname=os.path.basename(output_path))
+            except HTTPException as e:
+                logger.warning(f"Skipping {file.filename}: {e.detail}")
+                continue
+
+    zip_buffer.seek(0)
+    zip_path = job_dir / "converted.zip"
+    with open(zip_path, "wb") as f:
+        f.write(zip_buffer.getvalue())
+
+    return FileResponse(zip_path, filename="converted.zip", media_type="application/zip")
+
+
+@app.post("/api/hash")
+async def hash_file(
+    file: Optional[UploadFile] = File(None),
+    text: Optional[str] = Form(None),
+):
+    if file:
+        contents = await file.read()
+        if not validate_file_size(len(contents)):
+            raise HTTPException(status_code=413, detail="File too large")
+        data = contents
+        source = file.filename
+    elif text:
+        data = text.encode("utf-8")
+        source = "text"
+    else:
+        raise HTTPException(status_code=400, detail="Provide a file or text")
+
+    import hashlib
+    result = {
+        "source": source,
+        "md5": hashlib.md5(data).hexdigest(),
+        "sha1": hashlib.sha1(data).hexdigest(),
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
+    return JSONResponse(content=result)
 
 
 @app.exception_handler(Exception)

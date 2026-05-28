@@ -17,6 +17,8 @@ ALLOWED_EXTENSIONS = {
     "mp4", "avi", "mkv", "mov", "webm",
     # documents
     "pdf", "docx", "txt", "md", "xlsx", "csv",
+    # data
+    "json", "yaml", "yml", "xml",
 }
 
 FILE_CATEGORIES = {
@@ -24,6 +26,7 @@ FILE_CATEGORIES = {
     "audio": {"mp3", "wav", "ogg", "flac", "m4a", "aac"},
     "video": {"mp4", "avi", "mkv", "mov", "webm"},
     "document": {"pdf", "docx", "txt", "md", "xlsx", "csv"},
+    "data": {"json", "yaml", "yml", "xml"},
 }
 
 

@@ -1,7 +1,10 @@
 import os
-import subprocess
+import asyncio
+import logging
 from typing import Dict, List
 from .base import BaseConverter
+
+logger = logging.getLogger("hidconverter")
 
 
 class VideoConverter(BaseConverter):
@@ -21,14 +24,10 @@ class VideoConverter(BaseConverter):
         "webm": "libvpx",
     }
 
-    AUDIO_CODEC_MAP = {
-        "mp3": "libmp3lame",
-    }
-
     def supported_conversions(self) -> Dict[str, List[str]]:
         return self.SUPPORTED
 
-    def convert(self, file_path: str, target_format: str, output_dir: str) -> str:
+    async def convert(self, file_path: str, target_format: str, output_dir: str, **kwargs) -> str:
         ext = os.path.splitext(file_path)[1].lstrip(".").lower()
         if ext not in self.SUPPORTED or target_format not in self.SUPPORTED[ext]:
             raise ValueError(f"Conversion from {ext} to {target_format} is not supported")
@@ -39,10 +38,12 @@ class VideoConverter(BaseConverter):
             cmd = [
                 "ffmpeg", "-y",
                 "-i", file_path,
-                "-vn", "-acodec", "libmp3lame",
-                "-loglevel", "error",
-                output_path
+                "-vn",
             ]
+            bitrate = kwargs.get("bitrate")
+            if bitrate:
+                cmd.extend(["-b:a", str(bitrate)])
+            cmd.extend(["-loglevel", "error", output_path])
         else:
             vcodec = self.VIDEO_CODEC_MAP.get(target_format, "libx264")
             cmd = [
@@ -50,12 +51,22 @@ class VideoConverter(BaseConverter):
                 "-i", file_path,
                 "-vcodec", vcodec,
                 "-acodec", "aac",
-                "-loglevel", "error",
-                output_path
             ]
+            bitrate = kwargs.get("bitrate")
+            if bitrate:
+                cmd.extend(["-b:a", str(bitrate)])
+            cmd.extend(["-loglevel", "error", output_path])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
-        if result.returncode != 0:
-            raise RuntimeError(f"FFmpeg error: {result.stderr.strip()}")
+        logger.info(f"Running: {' '.join(cmd)}")
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            error_text = stderr.decode().strip() if stderr else "Unknown FFmpeg error"
+            raise RuntimeError(f"FFmpeg error: {error_text}")
 
         return output_path
