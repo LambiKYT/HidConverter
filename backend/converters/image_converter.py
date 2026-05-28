@@ -44,5 +44,7 @@ class ImageConverter(BaseConverter):
         elif target_format == "ico" and ext != "ico":
             img = img.resize((256, 256), Image.LANCZOS)
 
-        img.save(output_path, format=target_format.upper(), **save_kwargs)
+        fmt_map = {"jpg": "JPEG", "jpeg": "JPEG", "tif": "TIFF", "tiff": "TIFF"}
+        pil_format = fmt_map.get(target_format, target_format.upper())
+        img.save(output_path, format=pil_format, **save_kwargs)
         return output_path
