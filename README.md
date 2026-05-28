@@ -152,6 +152,36 @@ HidConverter/
 
 ---
 
+## Разработка
+
+### Форматирование кода
+
+Автоматическое форматирование всего проекта (black + isort + ruff):
+
+```bash
+ruff check . --fix && ruff format . && isort .
+```
+
+### Проверка качества (lint) без изменений
+
+Запуск линтера перед коммитом (без записи в файлы):
+
+```bash
+ruff check .
+ruff format . --check
+isort . --check-only
+```
+
+### Тесты со стилем
+
+Запуск pytest автоматически выполняет `ruff` благодаря плагину `pytest-ruff` и конфигу `addopts = --ruff`:
+
+```bash
+pytest
+```
+
+---
+
 ## Лицензия
 
 MIT

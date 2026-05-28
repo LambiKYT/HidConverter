@@ -1,0 +1,22 @@
+[project]
+name = "hidconverter"
+version = "3.0.0"
+requires-python = ">=3.12"
+
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["F", "E", "W"]
+ignore = ["E501"]
+
+
